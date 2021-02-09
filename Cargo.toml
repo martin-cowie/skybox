@@ -1,0 +1,21 @@
+[package]
+name = "skyplus"
+version = "0.1.0"
+authors = ["Martin Cowie <martinjcowie@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+csv = "1.1"
+futures = "0.3"
+# preferences = "1.1.0"
+maplit = "1.0.2"
+ssdp-client = "1.0.0"
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+roxmltree = "0.14.0"
+# sxd-xpath = "0.4.2"
+# sxd-document = ">= 0.2, < 0.4"
+serde = { version = "1", features = ["derive"] }
+url = "2.2.0"
