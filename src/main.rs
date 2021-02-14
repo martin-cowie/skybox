@@ -62,8 +62,8 @@ async fn main() -> Result<()> {
 
         let mut wtr = csv::Writer::from_writer(std::io::stdout());
         loop {
-            eprintln!("Fetching {} items from index {}", requested_count, starting_index);
-            let items = fetch_items(&service_url, starting_index, requested_count).await?;
+            let (items, total_items) = fetch_items(&service_url, starting_index, requested_count).await?;
+            eprintln!("Fetched {}/{} items.", starting_index + items.len(), total_items);
 
             for item in items.iter() {
                 wtr.serialize(item)?;
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count: usize) -> Result<Vec<Item>> {
+async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count: usize) -> Result<(Vec<Item>, usize)> {
 
     let starting_index = starting_index.to_string();
     let requested_count = requested_count.to_string();
@@ -126,6 +126,12 @@ async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count:
         n.tag_name().name() == "Result"
     ).unwrap();
 
+    // Get the element "/s:Envelope/s:Body/u:BrowseResponse/TotalMatches/text()"
+    let total_matches = doc.descendants().find(|n| 
+        n.tag_name().name() == "TotalMatches"
+    ).unwrap().text().unwrap();
+    let total_matches: usize = total_matches.parse().unwrap();
+
     let inner_xml = result_elem.text().unwrap();
     // println!("Result: {}", &inner_xml);
 
@@ -137,7 +143,7 @@ async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count:
         .filter_map(Result::ok)
         .collect();
 
-    Ok(items)
+    Ok((items, total_matches))
 }
 
 
