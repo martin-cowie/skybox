@@ -1,3 +1,5 @@
+use clap::clap_app;
+
 use futures::prelude::*;
 use maplit::hashmap;
 use reqwest;
@@ -16,6 +18,19 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _matches = clap_app!(myapp =>
+        (version: "0.1")
+        (about: "Interacts with SkyPlus PVRs")
+        (@subcommand ls =>
+            (about: "list recordings")
+            (@arg debug: -l ... "Long items listing")
+        )
+    ).get_matches();
+
+
+
+
+    //TODO: refactor everything below
     let search_target = URN::service("schemas-nds-com", "SkyBrowse", 2).into();
     let mut responses = ssdp_client::search(&search_target, TIMEOUT, 2).await?;
 
