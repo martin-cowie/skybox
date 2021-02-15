@@ -1,96 +1,145 @@
 use clap::clap_app;
 
 use futures::prelude::*;
+use indicatif::ProgressBar;
 use maplit::hashmap;
+use preferences::{AppInfo, PreferencesMap, Preferences};
 use reqwest;
 use roxmltree;
 use serde::Serialize;
 use ssdp_client::URN;
+use std::io::{self, BufRead};
 use std::time::{Duration, Instant};
 use tokio;
 use url::Url;
+
 
 // A simple type alias so as to DRY.
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 
 const TIMEOUT: Duration = Duration::from_secs(5);
+const APP_INFO: AppInfo = AppInfo{name: "skybox", author: "Martin Cowie"};
+const PREFS_KEY: &str = "skybox/location";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _matches = clap_app!(myapp =>
+    let matches = clap_app!(myapp =>
         (version: "0.1")
         (about: "Interacts with SkyPlus PVRs")
+        (@subcommand use => 
+            (about: "Choose to use a SkyPlus machine")            
+        )
         (@subcommand ls =>
             (about: "list recordings")
-            (@arg debug: -l ... "Long items listing")
+            (@arg long: -l "Long items listing")
         )
     ).get_matches();
 
+    if let Some(matches) = matches.subcommand_matches("ls") {
+        return list_items(matches).await;
+    } else 
+    if let Some(_matches) = matches.subcommand_matches("use") {
+        return use_skyplus().await;
+    } 
+    
+    Ok(())
+}
+
+async fn use_skyplus() -> Result<()> {
+
+    let spinner = ProgressBar::new_spinner(); 
+    spinner.enable_steady_tick(120);
+    spinner.set_message("Scanning...");
 
 
-
-    //TODO: refactor everything below
     let search_target = URN::service("schemas-nds-com", "SkyBrowse", 2).into();
     let mut responses = ssdp_client::search(&search_target, TIMEOUT, 2).await?;
 
+    let mut boxes: Vec<ssdp_client::SearchResponse> = Vec::new();
 
     while let Some(response) = responses.next().await {
         let response = response?;
-        eprintln!("- {}", response.search_target());
-        eprintln!("  - location: {}", response.location());
-        eprintln!("  - usn: {}", response.usn());
-        eprintln!("  - server: {}", response.server());
-
-        let query_start = Instant::now();
-
-        // Get the description for this service
-        let client = reqwest::Client::new();
-        let resp = client.get(response.location())
-            .header("user-agent", "SKY_skyplus")
-            .send()
-            .await?
-            .text()
-            .await?;
-
-        // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
-        let doc = roxmltree::Document::parse(&resp).unwrap();
-
-        let service_type_elem = doc.descendants().find(|n|
-            n.tag_name().name() == "serviceType" &&
-            n.text() == Some("urn:schemas-nds-com:service:SkyBrowse:2"
-        )).unwrap();
-
-        // Go up & down one
-        let parent = service_type_elem.parent_element().unwrap();
-        let control_url_element =
-            parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
-
-
-        // Compose the request URL
-        let mut service_url = Url::parse(response.location())?;
-        service_url.set_path(control_url_element.text().unwrap());
-
-        // println!("Control URL: {:?}", service_url.as_str());
-        let mut starting_index: usize = 0;
-        let requested_count: usize = 25;
-
-        let mut wtr = csv::Writer::from_writer(std::io::stdout());
-        loop {
-            let (items, total_items) = fetch_items(&service_url, starting_index, requested_count).await?;
-            eprintln!("Fetched {}/{} items.", starting_index + items.len(), total_items);
-
-            for item in items.iter() {
-                wtr.serialize(item)?;
-            }
-
-            if items.len() < requested_count {
-                break;
-            }
-            starting_index += items.len();
-        }
-        eprintln!("Fetched {} items from {} in {}s", starting_index, response.location(), query_start.elapsed().as_secs());
+        boxes.push(response);
     }
+
+    spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
+
+    for (i,skybox) in boxes.iter().enumerate() {
+        println!("{}:\t{}", i, skybox.location());
+    }
+    eprint!("Choose a skybox: "); //TODO: rethink all uses of unwrap
+
+    let line = io::stdin().lock().lines().next().unwrap()?;
+    let line_number: usize = line.parse().unwrap();
+
+    let skybox_location = boxes[line_number].location();
+    println!("Using {}", skybox_location);
+
+    let mut faves: PreferencesMap<String> = PreferencesMap::new();
+    faves.insert("location".into(), skybox_location.into());
+
+    // Store the user's preferences
+    faves.save(&APP_INFO, PREFS_KEY).unwrap();
+
+    Ok(())
+}
+
+async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
+
+    let faves = PreferencesMap::<String>::load(&APP_INFO, PREFS_KEY)?;
+    let location = &faves["location"];
+
+    let _long_listing = matches.is_present("long"); //TODO 
+
+    let query_start = Instant::now();
+
+    // Get the description for this service
+    let client = reqwest::Client::new();
+    let resp = client.get(location.as_str())
+        .header("user-agent", "SKY_skyplus")
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
+    let doc = roxmltree::Document::parse(&resp).unwrap();
+
+    let service_type_elem = doc.descendants().find(|n|
+        n.tag_name().name() == "serviceType" &&
+        n.text() == Some("urn:schemas-nds-com:service:SkyBrowse:2"
+    )).unwrap();
+
+    // Go up & down one
+    let parent = service_type_elem.parent_element().unwrap();
+    let control_url_element =
+        parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
+
+
+    // Compose the request URL
+    let mut service_url = Url::parse(location.as_str())?;
+    service_url.set_path(control_url_element.text().unwrap());
+
+    // println!("Control URL: {:?}", service_url.as_str());
+    let mut starting_index: usize = 0;
+    let requested_count: usize = 25;
+
+    let mut wtr = csv::Writer::from_writer(std::io::stdout());
+    loop {
+        let (items, total_items) = fetch_items(&service_url, starting_index, requested_count).await?;
+        eprintln!("Fetched {}/{} items.", starting_index + items.len(), total_items);
+
+        for item in items.iter() {
+            wtr.serialize(item)?;
+        }
+
+        if items.len() < requested_count {
+            break;
+        }
+        starting_index += items.len();
+    }
+    eprintln!("Fetched {} items from {} in {}s", starting_index, location, query_start.elapsed().as_secs());
 
     Ok(())
 }
