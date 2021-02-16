@@ -31,8 +31,12 @@ async fn main() -> Result<()> {
             (about: "Choose to use a SkyPlus machine")            
         )
         (@subcommand ls =>
-            (about: "list recordings")
+            (about: "list recordings") 
             (@arg long: -l "Long items listing")
+        )
+        (@subcommand rm => 
+            (about: "remove recordings")
+            (@arg filenames: #{1, 100} "recordings to remove") //TODO: 100 max is constraining
         )
     ).get_matches();
 
@@ -41,10 +45,16 @@ async fn main() -> Result<()> {
     } else 
     if let Some(_matches) = matches.subcommand_matches("use") {
         return use_skyplus().await;
-    } 
+    } else
+    if let Some(matches) = matches.subcommand_matches("rm") {
+        return remove_items(matches).await;
+    }
     
     Ok(())
 }
+
+const SKY_BROWSE_URN: &str = "urn:schemas-nds-com:service:SkyBrowse:2";
+const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
 
 async fn use_skyplus() -> Result<()> {
 
@@ -52,32 +62,56 @@ async fn use_skyplus() -> Result<()> {
     spinner.enable_steady_tick(120);
     spinner.set_message("Scanning...");
 
+    // let search_target = URN::service("schemas-nds-com", "SkyBrowse", 2).into();
+    let mut responses = ssdp_client::search(&SEARCH_TARGET.into(), TIMEOUT, 2).await?;
 
-    let search_target = URN::service("schemas-nds-com", "SkyBrowse", 2).into();
-    let mut responses = ssdp_client::search(&search_target, TIMEOUT, 2).await?;
-
-    let mut boxes: Vec<ssdp_client::SearchResponse> = Vec::new();
+    let mut boxes: Vec<PreferencesMap<String>> = Vec::new();
 
     while let Some(response) = responses.next().await {
         let response = response?;
-        boxes.push(response);
+
+        let client = reqwest::Client::new();
+        let resp = client.get(response.location())
+            .header("user-agent", "SKY_skyplus")
+            .send()
+            .await?
+            .text()
+            .await?;
+    
+        // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
+        let doc = roxmltree::Document::parse(&resp).unwrap();
+    
+        let service_type_elem = doc.descendants().find(|n|
+            n.tag_name().name() == "serviceType" &&
+            n.text() == Some(SKY_BROWSE_URN)
+        ).unwrap();
+    
+        // Go up & down one
+        let parent = service_type_elem.parent_element().unwrap();    
+        let control_url_element =
+            parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
+
+        // Compose the request URL
+        let mut service_url = Url::parse(response.location())?;
+        service_url.set_path(control_url_element.text().unwrap());
+
+        let mut faves: PreferencesMap<String> = PreferencesMap::new();
+        faves.insert(SKY_BROWSE_URN.into(), service_url.to_string());
+        boxes.push(faves);
     }
 
     spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
 
     for (i,skybox) in boxes.iter().enumerate() {
-        println!("{}:\t{}", i, skybox.location());
+        println!("{}:\t{:?}", i, skybox);
     }
     eprint!("Choose a skybox: "); //TODO: rethink all uses of unwrap
 
     let line = io::stdin().lock().lines().next().unwrap()?;
     let line_number: usize = line.parse().unwrap();
 
-    let skybox_location = boxes[line_number].location();
-    println!("Using {}", skybox_location);
-
-    let mut faves: PreferencesMap<String> = PreferencesMap::new();
-    faves.insert("location".into(), skybox_location.into());
+    let faves = &boxes[line_number];
+    println!("Using {:?}", faves);
 
     // Store the user's preferences
     faves.save(&APP_INFO, PREFS_KEY).unwrap();
@@ -85,41 +119,33 @@ async fn use_skyplus() -> Result<()> {
     Ok(())
 }
 
-async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
+async fn remove_items(matches: &clap::ArgMatches) -> Result<()> {
+    let files: Vec<_> = matches.values_of("filenames").unwrap().collect();
 
     let faves = PreferencesMap::<String>::load(&APP_INFO, PREFS_KEY)?;
-    let location = &faves["location"];
+    let service_url = &faves[SKY_BROWSE_URN]; //TODO: handle fails 
+    let service_url = Url::parse(service_url)?;
 
-    let _long_listing = matches.is_present("long"); //TODO 
+    for item in files.iter() {
+        remove_item(&service_url, item).await.unwrap();
+    }
 
+    Ok(())
+}
+
+async fn remove_item(service_url: &reqwest::Url, item_id: &str) -> Result<()> {
+    eprintln!("Removing: {} using {}", item_id, service_url);
+
+    Ok(())
+}
+
+async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
     let query_start = Instant::now();
 
-    // Get the description for this service
-    let client = reqwest::Client::new();
-    let resp = client.get(location.as_str())
-        .header("user-agent", "SKY_skyplus")
-        .send()
-        .await?
-        .text()
-        .await?;
-
-    // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
-    let doc = roxmltree::Document::parse(&resp).unwrap();
-
-    let service_type_elem = doc.descendants().find(|n|
-        n.tag_name().name() == "serviceType" &&
-        n.text() == Some("urn:schemas-nds-com:service:SkyBrowse:2"
-    )).unwrap();
-
-    // Go up & down one
-    let parent = service_type_elem.parent_element().unwrap();
-    let control_url_element =
-        parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
-
-
-    // Compose the request URL
-    let mut service_url = Url::parse(location.as_str())?;
-    service_url.set_path(control_url_element.text().unwrap());
+    let _long_listing = matches.is_present("long"); //TODO 
+    let faves = PreferencesMap::<String>::load(&APP_INFO, PREFS_KEY)?;
+    let service_url = &faves[SKY_BROWSE_URN]; //TODO: handle fails 
+    let service_url = Url::parse(service_url)?;
 
     // println!("Control URL: {:?}", service_url.as_str());
     let mut starting_index: usize = 0;
@@ -139,9 +165,16 @@ async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
         }
         starting_index += items.len();
     }
-    eprintln!("Fetched {} items from {} in {}s", starting_index, location, query_start.elapsed().as_secs());
+    eprintln!("Fetched {} items from {} in {}s", starting_index, service_url, query_start.elapsed().as_secs());
 
     Ok(())
+}
+
+fn envelope(body: &str) -> String {
+    format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>
+        <s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
+            <s:Body>{}</s:Body>
+        </s:Envelope>", body)
 }
 
 async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count: usize) -> Result<(Vec<Item>, usize)> {
@@ -163,11 +196,7 @@ async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count:
         .join("");
 
     let browse_elem = format!("<u:Browse xmlns:u=\"urn:schemas-nds-com:service:SkyBrowse:2\">{}</u:Browse>", arguments);
-
-    let body = format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>
-        <s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
-            <s:Body>{}</s:Body>
-        </s:Envelope>", browse_elem);
+    let body = envelope(browse_elem.as_str());
 
     // println!("body: {}", body);
 
