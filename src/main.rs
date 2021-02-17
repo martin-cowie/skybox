@@ -6,17 +6,16 @@ use maplit::hashmap;
 use preferences::{AppInfo, PreferencesMap, Preferences};
 use reqwest;
 use roxmltree;
-use serde::Serialize;
 use ssdp_client::URN;
 use std::io::{self, BufRead};
 use std::time::{Duration, Instant};
 use tokio;
 use url::Url;
 
-
-// A simple type alias so as to DRY.
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
+mod item;
+use item::Item;
+mod common;
+use common::{envelope, as_elements, Result};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 const APP_INFO: AppInfo = AppInfo{name: "skybox", author: "Martin Cowie"};
@@ -27,8 +26,8 @@ async fn main() -> Result<()> {
     let matches = clap_app!(skybox =>
         (version: "0.1")
         (about: "Interacts with SkyPlus PVRs")
-        (@subcommand use =>
-            (about: "Choose to use a SkyPlus machine")
+        (@subcommand scan =>
+            (about: "Scan for SkyPlus machines")
         )
         (@subcommand ls =>
             (about: "list recordings")
@@ -43,8 +42,8 @@ async fn main() -> Result<()> {
     if let Some(matches) = matches.subcommand_matches("ls") {
         return list_items(matches).await;
     } else
-    if let Some(_matches) = matches.subcommand_matches("use") {
-        return use_skyplus().await;
+    if let Some(_matches) = matches.subcommand_matches("scan") {
+        return scan_skyplus().await;
     } else
     if let Some(matches) = matches.subcommand_matches("rm") {
         return remove_items(matches).await;
@@ -56,15 +55,13 @@ async fn main() -> Result<()> {
 const SKY_BROWSE_URN: &str = "urn:schemas-nds-com:service:SkyBrowse:2";
 const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
 
-async fn use_skyplus() -> Result<()> {
+async fn scan_skyplus() -> Result<()> {
 
     let spinner = ProgressBar::new_spinner();
     spinner.enable_steady_tick(120);
     spinner.set_message("Scanning...");
 
-    // let search_target = URN::service("schemas-nds-com", "SkyBrowse", 2).into();
     let mut responses = ssdp_client::search(&SEARCH_TARGET.into(), TIMEOUT, 2).await?;
-
     let mut boxes: Vec<PreferencesMap<String>> = Vec::new();
 
     while let Some(response) = responses.next().await {
@@ -169,7 +166,6 @@ async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
     let service_url = &faves[SKY_BROWSE_URN]; //TODO: handle fails
     let service_url = Url::parse(service_url)?;
 
-    // println!("Control URL: {:?}", service_url.as_str());
     let mut starting_index: usize = 0;
     let requested_count: usize = 25;
 
@@ -192,19 +188,7 @@ async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn envelope(body: &str) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>
-        <s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
-            <s:Body>{}</s:Body>
-        </s:Envelope>", body)
-}
 
-fn as_elements(arguments: &std::collections::HashMap<&str, &str>) -> String {
-    arguments.iter()
-        .map(|(key, value)| format!("<{}>{}</{}>", &key, &value, &key))
-        .collect::<Vec<_>>()
-        .join("")
-}
 
 async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count: usize) -> Result<(Vec<Item>, usize)> {
 
@@ -263,64 +247,4 @@ async fn fetch_items(url: &reqwest::Url, starting_index: usize, requested_count:
         .collect();
 
     Ok((items, total_matches))
-}
-
-
-#[derive(Debug, Serialize)]
-struct Item {
-    id: String,
-    title: String,
-    description: String,
-    viewed: bool,
-
-    recorded_starttime: String,
-    recorded_duration: String,
-
-    channel_name: String,
-    series_id: Option<String>,
-    service_type: i64
-}
-
-impl Item {
-
-    fn string_of_element(elem: roxmltree::Node, name: &str) -> Option<String> { //TODO: return a simpler str& instead of String
-        let elem = elem.children().find(|e| e.tag_name().name() == name);
-
-        match elem {
-            None => None,
-            Some(node) => {
-                match node.text() {
-                    Some(text) => Some(String::from(text)), //TODO: Something less "staircasey"
-                    None => None,
-                }
-            },
-        }
-    }
-
-    pub fn build(elem: roxmltree::Node) -> Result<Item> {
-        // if this is absent - there's no recording
-        let recorded_duration = Item::string_of_element(elem, "recordedDuration");
-        let recorded_duration = match recorded_duration {
-            Some(duration) => duration,
-            None => return Err("future recording".into()),
-        };
-
-        let recorded_starttime = Item::string_of_element(elem, "recordedStartDateTime").unwrap();
-        let id = String::from(elem.attribute("id").unwrap());
-        let title = Item::string_of_element(elem, "title").unwrap();
-        let description = Item::string_of_element(elem, "description").unwrap();
-        let channel_name = Item::string_of_element(elem, "channelName").unwrap();
-        let service_type: i64 = Item::string_of_element(elem, "X_genre").unwrap().parse().unwrap();
-
-        let viewed = if "1" == Item::string_of_element(elem, "X_isViewed").unwrap() {true} else {false};
-        let series_id = Item::string_of_element(elem, "seriesID"); //NB: optional
-
-        Ok(Item {
-            id, title, description, viewed,
-            recorded_starttime, recorded_duration,
-            channel_name,
-            series_id,
-            service_type
-        })
-    }
 }
