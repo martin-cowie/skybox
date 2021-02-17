@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
 }
 
 const SKY_BROWSE_URN: &str = "urn:schemas-nds-com:service:SkyBrowse:2";
-const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
+const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2); //FIXME: these two are the same as &str
 
 async fn scan_skyplus() -> Result<()> {
 
