@@ -1,12 +1,14 @@
 use clap::clap_app;
 
 use futures::prelude::*;
+use futures::join;
+
 use indicatif::ProgressBar;
 use maplit::hashmap;
 use preferences::{AppInfo, PreferencesMap, Preferences};
 use reqwest;
 use roxmltree;
-use ssdp_client::URN;
+use ssdp_client::{URN, SearchTarget};
 use std::io::{self, BufRead};
 use std::time::{Duration, Instant};
 use tokio;
@@ -53,7 +55,10 @@ async fn main() -> Result<()> {
 }
 
 const SKY_BROWSE_URN: &str = "urn:schemas-nds-com:service:SkyBrowse:2";
-const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2); //FIXME: these two are the same as &str
+// const SEARCH_TARGET: URN = URN::service("schemas-nds-com", "SkyBrowse", 2); //FIXME: these two are the same as &str
+
+const SKY_PLAY: URN = URN::service("schemas-nds-com", "SkyPlay", 2);
+const SKY_BROWSE: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
 
 async fn scan_skyplus() -> Result<()> {
 
@@ -61,41 +66,34 @@ async fn scan_skyplus() -> Result<()> {
     spinner.enable_steady_tick(120);
     spinner.set_message("Scanning...");
 
-    let mut responses = ssdp_client::search(&SEARCH_TARGET.into(), TIMEOUT, 2).await?;
+    let play: &SearchTarget = &SKY_PLAY.into(); //NB: shame this cannot be done in the `search` calls
+    let browse: &SearchTarget = &SKY_BROWSE.into();
+
+    let (_play_locations, browse_locations) = join!(
+        ssdp_search(play), 
+        ssdp_search(browse)
+    );
+
     let mut boxes: Vec<PreferencesMap<String>> = Vec::new();
 
-    while let Some(response) = responses.next().await {
-        let response = response?;
-
+    // Get get service-url for each location
+    for location in browse_locations? {
         let client = reqwest::Client::new();
-        let resp = client.get(response.location())
+        let resp = client.get(location.clone())
             .header("user-agent", "SKY_skyplus")
             .send()
             .await?
             .text()
             .await?;
 
-        // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
         let doc = roxmltree::Document::parse(&resp).unwrap();
-
-        let service_type_elem = doc.descendants().find(|n|
-            n.tag_name().name() == "serviceType" &&
-            n.text() == Some(SKY_BROWSE_URN)
-        ).unwrap();
-
-        // Go up & down one
-        let parent = service_type_elem.parent_element().unwrap();
-        let control_url_element =
-            parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
-
-        // Compose the request URL
-        let mut service_url = Url::parse(response.location())?;
-        service_url.set_path(control_url_element.text().unwrap());
+        let browse_url = extract_service_url(&doc, SKY_BROWSE_URN, &location);
 
         let mut faves: PreferencesMap<String> = PreferencesMap::new();
-        faves.insert(SKY_BROWSE_URN.into(), service_url.to_string());
+        faves.insert(SKY_BROWSE_URN.into(), browse_url.to_string());
         boxes.push(faves);
     }
+
 
     spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
 
@@ -114,6 +112,34 @@ async fn scan_skyplus() -> Result<()> {
     faves.save(&APP_INFO, PREFS_KEY).unwrap();
 
     Ok(())
+}
+
+// Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
+fn extract_service_url(doc: &roxmltree::Document, urn: &str, root_url: &Url) -> Url {
+    let service_type_elem = doc.descendants().find(|n|
+        n.tag_name().name() == "serviceType" &&
+        n.text() == Some(urn)
+    ).unwrap();
+
+    // Go up & down one
+    let parent = service_type_elem.parent_element().unwrap();
+    let control_url_element =
+        parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
+
+    // Compose the request URL
+    let mut result = root_url.clone();
+    result.set_path(control_url_element.text().unwrap());
+    result
+}
+
+async fn ssdp_search(st: &SearchTarget) -> Result<Vec<Url>> {   
+    let mut result: Vec<Url> = Vec::new();
+    let mut responses = ssdp_client::search(st.into(), TIMEOUT, 2).await?;
+    while let Some(response) = responses.next().await {
+        let response = response?;
+        result.push(Url::parse(response.location())?);
+    }
+    Ok(result)
 }
 
 async fn remove_items(matches: &clap::ArgMatches) -> Result<()> {
