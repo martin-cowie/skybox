@@ -1,7 +1,11 @@
 use serde::Serialize;
+use regex::Regex;
 use super::common::Result;
+use std::time::Duration;
+use lazy_static::lazy_static;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct Item {
     id: String,
     title: String,
@@ -9,14 +13,30 @@ pub struct Item {
     viewed: bool,
 
     recorded_starttime: String,
-    recorded_duration: String,
+    recorded_duration: u64, //Seconds
 
     channel_name: String,
     series_id: Option<String>,
     service_type: i64
 }
 
+lazy_static! {
+    static ref DURATION_RE: Regex = Regex::new(r"P0D(\d+):(\d+):(\d+)").unwrap();
+}
+
 impl Item {
+
+    fn parse_duration(duration: &str) -> Result<Duration> {
+        let caps = DURATION_RE.captures(duration).unwrap();
+
+        //TODO: Map this Option::unwrap into a Result
+        let hours: u32 = caps.get(1).unwrap().as_str().parse()?;
+        let mins: u32 = caps.get(2).unwrap().as_str().parse()?;
+        let secs: u32 = caps.get(3).unwrap().as_str().parse()?;
+
+        Ok(Duration::new((secs + (mins * 60) + (hours * (60 * 60))).into(), 0))
+    }
+
 
     fn string_of_element(elem: roxmltree::Node, name: &str) -> Option<String> { //TODO: return a simpler str& instead of String
         let elem = elem.children().find(|e| e.tag_name().name() == name);
@@ -39,6 +59,7 @@ impl Item {
             Some(duration) => duration,
             None => return Err("future recording".into()),
         };
+        let recorded_duration = Item::parse_duration(recorded_duration.as_str())?.as_secs();
 
         let recorded_starttime = Item::string_of_element(elem, "recordedStartDateTime").unwrap();
         let id = String::from(elem.attribute("id").unwrap());

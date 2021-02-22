@@ -70,7 +70,7 @@ async fn scan_skyplus() -> Result<()> {
     let browse: &SearchTarget = &SKY_BROWSE.into();
 
     let (_play_locations, browse_locations) = join!(
-        ssdp_search(play), 
+        ssdp_search(play),
         ssdp_search(browse)
     );
 
@@ -132,7 +132,7 @@ fn extract_service_url(doc: &roxmltree::Document, urn: &str, root_url: &Url) -> 
     result
 }
 
-async fn ssdp_search(st: &SearchTarget) -> Result<Vec<Url>> {   
+async fn ssdp_search(st: &SearchTarget) -> Result<Vec<Url>> {
     let mut result: Vec<Url> = Vec::new();
     let mut responses = ssdp_client::search(st.into(), TIMEOUT, 2).await?;
     while let Some(response) = responses.next().await {
@@ -195,7 +195,9 @@ async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
     let mut starting_index: usize = 0;
     let requested_count: usize = 25;
 
-    let mut wtr = csv::Writer::from_writer(std::io::stdout());
+    // let mut wtr = csv::Writer::from_writer(std::io::stdout());
+    let mut wtr = csv::WriterBuilder::new().from_writer(std::io::stdout());
+
     loop {
         let (items, total_items) = fetch_items(&service_url, starting_index, requested_count).await?;
         eprintln!("Fetched {}/{} items.", starting_index + items.len(), total_items);
