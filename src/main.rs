@@ -195,8 +195,7 @@ async fn list_items(matches: &clap::ArgMatches) -> Result<()> {
     let mut starting_index: usize = 0;
     let requested_count: usize = 25;
 
-    // let mut wtr = csv::Writer::from_writer(std::io::stdout());
-    let mut wtr = csv::WriterBuilder::new().from_writer(std::io::stdout());
+    let mut wtr = csv::Writer::from_writer(std::io::stdout());
 
     loop {
         let (items, total_items) = fetch_items(&service_url, starting_index, requested_count).await?;

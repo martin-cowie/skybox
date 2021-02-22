@@ -4,6 +4,7 @@ use super::common::Result;
 use std::time::Duration;
 use lazy_static::lazy_static;
 
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Item {
@@ -17,7 +18,36 @@ pub struct Item {
 
     channel_name: String,
     series_id: Option<String>,
-    service_type: i64
+    service_type: ServiceType,
+}
+
+#[derive(Debug, Serialize)]
+#[repr(u8)]
+pub enum ServiceType {
+    Music = 16,
+    Documentary = 11,
+    Lifestyle = 8,
+    Sport = 7,
+    Movies = 6,
+    News = 5,
+    Entertainment = 3,
+    Kids = 2,
+
+    Unknown = 0
+}
+
+fn service_type_from(num: i32) -> ServiceType { //TODO: surely something more idiomatic
+    match num {
+        16 => ServiceType::Music,
+        11 => ServiceType::Documentary,
+        8 => ServiceType::Lifestyle,
+        7 => ServiceType::Sport,
+        6 => ServiceType::Movies,
+        5 => ServiceType::News,
+        3 => ServiceType::Entertainment,
+        2 => ServiceType::Kids,
+        _ => ServiceType::Unknown
+    }
 }
 
 lazy_static! {
@@ -66,17 +96,20 @@ impl Item {
         let title = Item::string_of_element(elem, "title").unwrap();
         let description = Item::string_of_element(elem, "description").unwrap();
         let channel_name = Item::string_of_element(elem, "channelName").unwrap();
-        let service_type: i64 = Item::string_of_element(elem, "X_genre").unwrap().parse().unwrap();
+        let service_type: i32 = Item::string_of_element(elem, "X_genre").unwrap().parse()?;
+
+        let service_type = service_type_from(service_type);
 
         let viewed = if "1" == Item::string_of_element(elem, "X_isViewed").unwrap() {true} else {false};
         let series_id = Item::string_of_element(elem, "seriesID"); //NB: optional
+
 
         Ok(Item {
             id, title, description, viewed,
             recorded_starttime, recorded_duration,
             channel_name,
             series_id,
-            service_type
+            service_type,
         })
     }
 }
