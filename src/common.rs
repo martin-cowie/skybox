@@ -1,5 +1,12 @@
+use ssdp_client::URN;
+
+
 // A simple type alias so as to DRY.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+pub const SKY_PLAY: URN = URN::service("schemas-nds-com", "SkyPlay", 2);
+pub const SKY_BROWSE: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
+
 
 pub fn envelope(body: &str) -> String {
     format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>

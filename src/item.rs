@@ -1,12 +1,13 @@
+use super::common::Result;
+
 use serde::Serialize;
 use regex::Regex;
-use super::common::Result;
 use std::time::Duration;
 use lazy_static::lazy_static;
 
 
-#[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
+#[derive(Debug, Serialize)]
 pub struct Item {
     id: String,
     title: String,
