@@ -9,10 +9,10 @@ pub const SKY_BROWSE: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
 
 
 pub fn envelope(body: &str) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>
-        <s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
+    format!(r#"<?xml version="1.0" encoding="utf-8"?>
+        <s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
             <s:Body>{}</s:Body>
-        </s:Envelope>", body)
+        </s:Envelope>"#, body)
 }
 
 pub fn as_elements(arguments: &std::collections::HashMap<&str, &str>) -> String {

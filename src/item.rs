@@ -10,6 +10,8 @@ use lazy_static::lazy_static;
 #[derive(Debug, Serialize)]
 pub struct Item {
     id: String,
+    res: String,
+
     title: String,
     description: String,
     viewed: bool,
@@ -97,6 +99,7 @@ impl Item {
         let title = Item::string_of_element(elem, "title").unwrap();
         let description = Item::string_of_element(elem, "description").unwrap();
         let channel_name = Item::string_of_element(elem, "channelName").unwrap();
+        let res = Item::string_of_element(elem, "res").unwrap();
         let service_type: i32 = Item::string_of_element(elem, "X_genre").unwrap().parse()?;
 
         let service_type = service_type_from(service_type);
@@ -106,7 +109,7 @@ impl Item {
 
 
         Ok(Item {
-            id, title, description, viewed,
+            id, title, description, viewed, res,
             recorded_starttime, recorded_duration,
             channel_name,
             series_id,

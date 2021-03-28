@@ -7,6 +7,8 @@ use maplit::hashmap;
 use preferences::{AppInfo, Preferences};
 
 const USER_AGENT: &str = "SKY_skyplus";
+const CONTENT_TYPE: &str = r#"text/xml; charset="utf-8""#;
+
 const APP_INFO: AppInfo = AppInfo{name: "skybox", author: "Martin Cowie"};
 const PREFS_KEY: &str = "skybox/location";
 
@@ -75,7 +77,7 @@ impl SkyBox {
         let client = reqwest::Client::new();
         let resp = client.post(&self.browse_url)
             .header("user-agent", USER_AGENT)
-            .header("Content-Type", "text/xml; charset=\"utf-8\"")
+            .header("Content-Type", CONTENT_TYPE)
             .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyBrowse:2#Browse""#)
             .body(body)
             .send()
@@ -136,7 +138,7 @@ impl SkyBox {
         let client = reqwest::Client::new();
         let resp = client.post(&self.browse_url)
             .header("user-agent", USER_AGENT)
-            .header("Content-Type", "text/xml; charset=\"utf-8\"")
+            .header("Content-Type", CONTENT_TYPE)
             .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyBrowse:2#DestroyObject""#)
             .body(body)
             .send()
@@ -148,6 +150,38 @@ impl SkyBox {
         } else {
             Err("Delete failed".into())
         }
+    }
+
+    pub async fn play(&self,  matches: &clap::ArgMatches) -> Result<()> {
+        let item_res = matches.value_of("filename").unwrap();
+
+        let uri = format!("{}?position=0&amp;speed=1", item_res);
+
+        let play_elem = format!(
+            r#"<u:SetAVTransportURI xmlns:u="urn:schemas-nds-com:service:SkyPlay:2">{}</u:SetAVTransportURI>"#,
+            as_elements(&hashmap!{
+                "InstanceID" => "0",
+                "CurrentURI" => &uri,
+                "CurrentURIMetaData" => "NOT_IMPLEMENTED"
+            }));
+        let body = envelope(play_elem.as_str());
+
+        let client = reqwest::Client::new();
+        let resp = client.post(&self.play_url)
+            .header("user-agent", USER_AGENT)
+            .header("Content-Type", CONTENT_TYPE)
+            .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyPlay:2#SetAVTransportURI""#)
+            .body(body)
+            .send()
+            .await?;
+
+        if resp.status() == 200 {
+            println!("Playing: {}", item_res);
+            Ok(())
+        } else {
+            Err("Play request failed".into())
+        }
+
     }
 
 }

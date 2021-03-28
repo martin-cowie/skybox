@@ -38,29 +38,14 @@ impl Scanner {
         let play: &SearchTarget = &SKY_PLAY.into(); //NB: shame this cannot be done in the `search` calls
         let browse: &SearchTarget = &SKY_BROWSE.into();
 
-        let (play_locations, browse_locations) = join!(
-            self.ssdp_search(play),
-            self.ssdp_search(browse)
+        let (sky_play, sky_browse) = (&SKY_PLAY, &SKY_BROWSE);
+        let (play_urls, browse_urls) = join!(
+            self.ssdp_search(play, sky_play),
+            self.ssdp_search(browse, sky_browse)
         );
 
-
-        // Get service-url for each location
-        let mut browse_urls: HashMap<String, Url> = HashMap::new();
-        for location in browse_locations? {
-            let browse_url = self.get_service_url(&SKY_BROWSE, &location).await?;
-            browse_urls.insert(
-                browse_url.host_str().unwrap().to_string(),
-                browse_url);
-        }
-
-        // Get play-url for each location
-        let mut play_urls: HashMap<String, Url> = HashMap::new();
-        for location in play_locations? {
-            let browse_url = self.get_service_url(&SKY_PLAY, &location).await?;
-            play_urls.insert(
-                browse_url.host_str().unwrap().to_string(),
-                browse_url);
-        }
+        let play_urls = play_urls.unwrap();
+        let browse_urls = browse_urls.unwrap();
 
         // Merge/Zip two URL dicts together
         let mut boxes: Vec<SkyBox> = Vec::new();
@@ -126,13 +111,28 @@ impl Scanner {
         result
     }
 
-    async fn ssdp_search(&self, st: &SearchTarget) -> Result<Vec<Url>> {
-        let mut result: Vec<Url> = Vec::new();
+    /**
+     * SSDP scan.
+     * Get the descriptor document for each response.
+     * @return a map of <IP-Address, ServiceURL>
+     */
+    async fn ssdp_search(&self, st: &SearchTarget, urn: &URN) -> Result<HashMap<String, Url>> {
+        let mut locations: Vec<Url> = Vec::new();
         let mut responses = ssdp_client::search(st.into(), TIMEOUT, 2).await?;
         while let Some(response) = responses.next().await {
             let response = response?;
-            result.push(Url::parse(response.location())?);
+            locations.push(Url::parse(response.location())?);
         }
+
+        // Get service-url for each location
+        let mut result: HashMap<String, Url> = HashMap::new();
+        for location in locations {
+            let browse_url = self.get_service_url(urn, &location).await?;
+            result.insert(
+                browse_url.host_str().unwrap().to_string(),
+                browse_url);
+        }
+
         Ok(result)
     }
 

@@ -25,12 +25,19 @@ async fn main() -> Result<()> {
         )
         (@subcommand rm =>
             (about: "remove recordings")
-            (@arg filenames: #{1, 100} "recordings to remove") //TODO: 100 max is constraining
+            (@arg filenames: ... "recordings to remove, e.g. BOOK:688476834 BOOK:688555858")
+        )
+        (@subcommand play =>
+            (about: "play a recording")
+            (@arg filename: +required "recording to play back, e.g. file://pvr/290B3177")
         )
     ).get_matches();
 
     let scanner = Scanner::new();
 
+    if let Some(_matches) = matches.subcommand_matches("scan") {
+        return scanner.scan().await;
+    } else
     if let Some(matches) = matches.subcommand_matches("ls") {
         match scanner.get_selected() {
             None => println!("Use subcommand `scan` to find a skybox"),
@@ -38,13 +45,16 @@ async fn main() -> Result<()> {
         }
 
     } else
-    if let Some(_matches) = matches.subcommand_matches("scan") {
-        return scanner.scan().await;
-    } else
     if let Some(matches) = matches.subcommand_matches("rm") {
         match scanner.get_selected() {
             None => println!("Use subcommand `scan` to find a skybox"),
             Some(skybox) => skybox.remove_items(matches).await?
+        }
+    } else
+    if let Some(matches) = matches.subcommand_matches("play") {
+        match scanner.get_selected() {
+            None => println!("Use subcommand `scan` to find a skybox"),
+            Some(skybox) => skybox.play(matches).await?
         }
     }
 
