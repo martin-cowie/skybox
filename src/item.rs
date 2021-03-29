@@ -54,13 +54,16 @@ fn service_type_from(num: i32) -> ServiceType { //TODO: surely something more id
 }
 
 lazy_static! {
-    static ref DURATION_RE: Regex = Regex::new(r"P0D(\d+):(\d+):(\d+)").unwrap();
+    static ref DURATION_RE: Regex = Regex::new(r"P0D(\d+):(\d+):(\d+)").expect("Cannot compile regex!");
 }
 
 impl Item {
 
     fn parse_duration(duration: &str) -> Result<Duration> {
-        let caps = DURATION_RE.captures(duration).unwrap();
+        let caps = match DURATION_RE.captures(duration) {
+            None => return Err(format!("Cannot parse duration: {}", duration).into()),
+            Some(caps) => caps
+        };
 
         //TODO: Map this Option::unwrap into a Result
         let hours: u32 = caps.get(1).unwrap().as_str().parse()?;
@@ -104,7 +107,7 @@ impl Item {
 
         let service_type = service_type_from(service_type);
 
-        let viewed = if "1" == Item::string_of_element(elem, "X_isViewed").unwrap() {true} else {false};
+        let viewed = "1" == Item::string_of_element(elem, "X_isViewed").unwrap();
         let series_id = Item::string_of_element(elem, "seriesID"); //NB: optional
 
 

@@ -1,7 +1,4 @@
 use clap::clap_app;
-
-use tokio;
-
 mod common;
 mod item;
 mod skybox;
@@ -37,21 +34,23 @@ async fn main() -> Result<()> {
 
     if let Some(_matches) = matches.subcommand_matches("scan") {
         return scanner.scan().await;
-    } else
-    if let Some(matches) = matches.subcommand_matches("ls") {
+    }
+
+    else if let Some(matches) = matches.subcommand_matches("ls") {
         match scanner.get_selected() {
             None => println!("Use subcommand `scan` to find a skybox"),
             Some(skybox) => skybox.list_items(matches).await?
         }
+    }
 
-    } else
-    if let Some(matches) = matches.subcommand_matches("rm") {
+    else if let Some(matches) = matches.subcommand_matches("rm") {
         match scanner.get_selected() {
             None => println!("Use subcommand `scan` to find a skybox"),
             Some(skybox) => skybox.remove_items(matches).await?
         }
-    } else
-    if let Some(matches) = matches.subcommand_matches("play") {
+    }
+
+    else if let Some(matches) = matches.subcommand_matches("play") {
         match scanner.get_selected() {
             None => println!("Use subcommand `scan` to find a skybox"),
             Some(skybox) => skybox.play(matches).await?

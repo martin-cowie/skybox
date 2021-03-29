@@ -106,7 +106,7 @@ impl SkyBox {
         let doc = roxmltree::Document::parse(inner_xml).unwrap();
         let items: Vec<_> = doc.descendants()
             .filter(|n|n.tag_name().name() == "item")
-            .map(|item_elem|Item::build(item_elem))
+            .map(Item::build)
             .filter_map(Result::ok)
             .collect();
 

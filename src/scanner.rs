@@ -118,7 +118,7 @@ impl Scanner {
      */
     async fn ssdp_search(&self, st: &SearchTarget, urn: &URN) -> Result<HashMap<String, Url>> {
         let mut locations: Vec<Url> = Vec::new();
-        let mut responses = ssdp_client::search(st.into(), TIMEOUT, 2).await?;
+        let mut responses = ssdp_client::search(st, TIMEOUT, 2).await?;
         while let Some(response) = responses.next().await {
             let response = response?;
             locations.push(Url::parse(response.location())?);
