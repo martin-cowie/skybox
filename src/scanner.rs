@@ -44,13 +44,19 @@ impl Scanner {
             self.ssdp_search(browse, sky_browse)
         );
 
-        let play_urls = play_urls.unwrap();
-        let browse_urls = browse_urls.unwrap();
+        let play_urls = play_urls?;
+        let browse_urls = browse_urls?;
 
         // Merge/Zip two URL dicts together
         let mut boxes: Vec<SkyBox> = Vec::new();
         for (ip_addr, browse_url) in browse_urls {
-            let play_url = play_urls.get(&ip_addr).unwrap(); //TODO: handle missing k/v pair
+            let play_url = match play_urls.get(&ip_addr) {
+                Some(url) => url,
+                None => {
+                    eprintln!("No matching URL {}", ip_addr);
+                    continue;
+                }
+            };
 
             println!("Found {} and {}", play_url, browse_url);
             let skybox = SkyBox {
@@ -66,10 +72,24 @@ impl Scanner {
         for (i,skybox) in boxes.iter().enumerate() {
             println!("{}:\t{:?}", i, skybox);
         }
-        eprint!("Choose a skybox: "); //TODO: rethink all uses of unwrap
+        eprint!("Choose a skybox: ");
 
-        let line = io::stdin().lock().lines().next().unwrap()?;
-        let line_number: usize = line.parse().unwrap();
+        let line = match io::stdin().lock().lines().next() {
+            None => panic!("Line cannot be empty"),
+            Some(result) => {
+                match result {
+                    Err(err) => panic!("Cannot read input: {}", err),
+                    Ok(line) => line
+                }
+            }
+        };
+
+        let line_number: usize = match line.parse() {
+            Ok(number) => number,
+            Err(_) => {
+                panic!("Cannot parse '{}' as a number", line)
+            }
+        };
 
         let skybox = &boxes[line_number];
         println!("Using {:?}", skybox);
@@ -87,28 +107,39 @@ impl Scanner {
             .send().await?
             .text().await?;
 
-        let doc = roxmltree::Document::parse(&resp).unwrap();
-        let browse_url = self.extract_service_url(&doc, urn, &location);
+        let doc = match roxmltree::Document::parse(&resp) {
+            Ok(doc) => doc,
+            Err(_) => return Err(format!("Cannot parse XML from {}", location).into())
+        };
 
-        Ok(browse_url)
+        return self.extract_service_url(&doc, urn, &location);
     }
 
     // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
-    fn extract_service_url(&self, doc: &roxmltree::Document, urn: &URN, root_url: &Url) -> Url {
-        let service_type_elem = doc.descendants().find(|n|
+    fn extract_service_url(&self, doc: &roxmltree::Document, urn: &URN, root_url: &Url) -> Result<Url> {
+        let service_type_elem = match doc.descendants().find(|n|
             n.tag_name().name() == "serviceType" &&
             n.text() == Some(&urn.to_string())
-        ).unwrap();
+        ) {
+            Some(elem) => elem,
+            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
+        };
 
         // Go up & down one
-        let parent = service_type_elem.parent_element().unwrap();
-        let control_url_element =
-            parent.descendants().find(|n| n.tag_name().name() == "controlURL").unwrap();
+        let parent = service_type_elem.parent_element().expect("Cannot find element parent");
+        let control_url_element = match parent.descendants().find(|n| n.tag_name().name() == "controlURL") {
+            Some(url) => url,
+            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
+        };
 
         // Compose the request URL
         let mut result = root_url.clone();
-        result.set_path(control_url_element.text().unwrap());
-        result
+        result.set_path(match control_url_element.text() {
+            Some(text) => text,
+            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
+        });
+
+        Ok(result)
     }
 
     /**
@@ -124,12 +155,17 @@ impl Scanner {
             locations.push(Url::parse(response.location())?);
         }
 
+        //TODO: join these two paras, and remove `locations`
+
         // Get service-url for each location
         let mut result: HashMap<String, Url> = HashMap::new();
         for location in locations {
             let browse_url = self.get_service_url(urn, &location).await?;
             result.insert(
-                browse_url.host_str().unwrap().to_string(),
+                match browse_url.host_str() {
+                    Some(string) => string.to_string(),
+                    None => return Err(format!("Cannot host component from URL {}", browse_url))
+                },
                 browse_url);
         }
 
