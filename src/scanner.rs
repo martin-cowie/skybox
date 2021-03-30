@@ -95,9 +95,7 @@ impl Scanner {
         println!("Using {:?}", skybox);
 
         // Store the user's preferences
-        skybox.save_box();
-
-        Ok(())
+        return skybox.save_box();
     }
 
     async fn get_service_url(&self, urn: &URN, location: &Url) -> Result<Url> {
@@ -164,7 +162,7 @@ impl Scanner {
             result.insert(
                 match browse_url.host_str() {
                     Some(string) => string.to_string(),
-                    None => return Err(format!("Cannot host component from URL {}", browse_url))
+                    None => return Err(format!("Cannot host component from URL {}", browse_url).into())
                 },
                 browse_url);
         }

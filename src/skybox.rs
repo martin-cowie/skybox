@@ -23,7 +23,7 @@ impl SkyBox {
     pub fn save_box(&self) -> Result<()> {
         return match self.save(&APP_INFO, PREFS_KEY) {
             Ok(_) => Ok(()),
-            Err(error) => Err(format!("Cannot save skybox: {}", error))
+            Err(error) => Err(format!("Cannot save skybox: {}", error).into())
         }
     }
 
