@@ -20,8 +20,11 @@ pub struct SkyBox {
 
 impl SkyBox {
 
-    pub fn save_box(&self) {
-        self.save(&APP_INFO, PREFS_KEY).unwrap();
+    pub fn save_box(&self) -> Result<()> {
+        return match self.save(&APP_INFO, PREFS_KEY) {
+            Ok(_) => Ok(()),
+            Err(error) => Err(format!("Cannot save skybox: {}", error))
+        }
     }
 
     pub fn load_box() -> Option<SkyBox> {
@@ -85,8 +88,6 @@ impl SkyBox {
             .text()
             .await?;
 
-        // eprintln!("Response to service call: {}", resp);
-
         // Parse the response and get element 'Result'
         let doc = roxmltree::Document::parse(&resp).unwrap();
         let result_elem = doc.descendants().find(|n|
@@ -100,7 +101,6 @@ impl SkyBox {
         let total_matches: usize = total_matches.parse().unwrap();
 
         let inner_xml = result_elem.text().unwrap();
-        // println!("Result: {}", &inner_xml);
 
         // parse inner XML
         let doc = roxmltree::Document::parse(inner_xml).unwrap();
@@ -153,7 +153,7 @@ impl SkyBox {
     }
 
     pub async fn play(&self,  matches: &clap::ArgMatches) -> Result<()> {
-        let item_res = matches.value_of("filename").unwrap();
+        let item_res = matches.value_of("filename").expect("Expecting argument");
 
         let uri = format!("{}?position=0&amp;speed=1", item_res);
 
