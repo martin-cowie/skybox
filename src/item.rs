@@ -57,59 +57,52 @@ lazy_static! {
     static ref DURATION_RE: Regex = Regex::new(r"P0D(\d+):(\d+):(\d+)").expect("Cannot compile regex!");
 }
 
+//TODO: return a simpler str& instead of String
+fn string_of_element(elem: roxmltree::Node, name: &str) -> Result<String> {
+    let elem = elem.children().find(|e| e.tag_name().name() == name);
+    let result: String = elem.ok_or(format!("Element `{}` is absent", name))?
+        .text()
+        .ok_or(format!("Element `{}` is empty", name))?
+        .into();
+    Ok(result)
+}
+
+fn parse_duration(duration: &str) -> Result<Duration> {
+    let caps = match DURATION_RE.captures(duration) {
+        None => return Err(format!("Cannot parse duration: {}", duration).into()),
+        Some(caps) => caps
+    };
+
+    let hours: u32 = caps.get(1).ok_or("Hours field is absent")?.as_str().parse()?;
+    let mins: u32 = caps.get(2).ok_or("Minutes field is absent")?.as_str().parse()?;
+    let secs: u32 = caps.get(3).ok_or("Seconds field is absent")?.as_str().parse()?;
+
+    Ok(Duration::new((secs + (mins * 60) + (hours * (60 * 60))).into(), 0))
+}
+
+
 impl Item {
 
-    fn parse_duration(duration: &str) -> Result<Duration> {
-        let caps = match DURATION_RE.captures(duration) {
-            None => return Err(format!("Cannot parse duration: {}", duration).into()),
-            Some(caps) => caps
-        };
-
-        //TODO: Map this Option::unwrap into a Result
-        let hours: u32 = caps.get(1).unwrap().as_str().parse()?;
-        let mins: u32 = caps.get(2).unwrap().as_str().parse()?;
-        let secs: u32 = caps.get(3).unwrap().as_str().parse()?;
-
-        Ok(Duration::new((secs + (mins * 60) + (hours * (60 * 60))).into(), 0))
-    }
-
-
-    fn string_of_element(elem: roxmltree::Node, name: &str) -> Option<String> { //TODO: return a simpler str& instead of String
-        let elem = elem.children().find(|e| e.tag_name().name() == name);
-
-        match elem {
-            None => None,
-            Some(node) => {
-                match node.text() {
-                    Some(text) => Some(String::from(text)), //TODO: Something less "staircasey"
-                    None => None,
-                }
-            },
-        }
-    }
-
     pub fn build(elem: roxmltree::Node) -> Result<Item> {
-        // if this is absent - there's no recording
-        let recorded_duration = Item::string_of_element(elem, "recordedDuration");
-        let recorded_duration = match recorded_duration {
-            Some(duration) => duration,
-            None => return Err("future recording".into()),
-        };
-        let recorded_duration = Item::parse_duration(recorded_duration.as_str())?.as_secs();
 
-        let recorded_starttime = Item::string_of_element(elem, "recordedStartDateTime").unwrap();
-        let id = String::from(elem.attribute("id").unwrap());
-        let title = Item::string_of_element(elem, "title").unwrap();
-        let description = Item::string_of_element(elem, "description").unwrap();
-        let channel_name = Item::string_of_element(elem, "channelName").unwrap();
-        let res = Item::string_of_element(elem, "res").unwrap();
-        let service_type: i32 = Item::string_of_element(elem, "X_genre").unwrap().parse()?;
+        let recorded_duration = string_of_element(elem, "recordedDuration")?;
+        let recorded_duration = parse_duration(recorded_duration.as_str())?.as_secs();
+
+        let recorded_starttime = string_of_element(elem, "recordedStartDateTime")?;
+        let id = elem.attribute("id").ok_or("Field `id` is absent")?.into();
+        let title = string_of_element(elem, "title")?;
+        let description = string_of_element(elem, "description")?;
+        let channel_name = string_of_element(elem, "channelName")?;
+        let res = string_of_element(elem, "res")?;
+        let service_type: i32 = string_of_element(elem, "X_genre")?.parse()?;
 
         let service_type = service_type_from(service_type);
 
-        let viewed = "1" == Item::string_of_element(elem, "X_isViewed").unwrap();
-        let series_id = Item::string_of_element(elem, "seriesID"); //NB: optional
-
+        let viewed = "1" == string_of_element(elem, "X_isViewed")?;
+        let series_id = elem.children()
+            .find(|e| e.tag_name().name() == "seriesID")
+            .map_or(None, |node| node.text())
+            .map_or(None, |s| Some(String::from(s)));
 
         Ok(Item {
             id, title, description, viewed, res,

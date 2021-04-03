@@ -88,15 +88,19 @@ impl SkyBox {
         let doc = roxmltree::Document::parse(&resp)?;
         let result_elem = doc.descendants().find(|n|
             n.tag_name().name() == "Result"
-        ).unwrap();
+        ).ok_or("Cannot find `Result` element")?;
+        let inner_xml = result_elem.text()
+            .ok_or("`Result` element is empty")?;
 
         // Get the element "/s:Envelope/s:Body/u:BrowseResponse/TotalMatches/text()"
         let total_matches = doc.descendants().find(|n|
             n.tag_name().name() == "TotalMatches"
-        ).unwrap().text().unwrap();
-        let total_matches: usize = total_matches.parse().unwrap();
+        ).ok_or("Cannot find `TotalMatches` element")?
+        .text()
+        .ok_or("`TotalMatches` element is empty")?;
 
-        let inner_xml = result_elem.text().unwrap();
+        let total_matches: usize = total_matches.parse()?;
+
 
         // parse inner XML
         let doc = roxmltree::Document::parse(inner_xml)?;
@@ -111,10 +115,12 @@ impl SkyBox {
 
 
     pub async fn remove_items(&self,  matches: &clap::ArgMatches) -> Result<()> {
-        let files: Vec<_> = matches.values_of("filenames").unwrap().collect();
+        let files: Vec<_> = matches.values_of("filenames")
+            .ok_or("Require at least one item to remove")?
+            .collect();
 
         for item in files.iter() {
-            self.remove_item(item).await.unwrap();
+            self.remove_item(item).await?;
         }
 
         Ok(())
