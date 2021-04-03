@@ -101,8 +101,7 @@ impl Item {
         let viewed = "1" == string_of_element(&elem, "X_isViewed")?;
         let series_id = elem.children()
             .find(|e| e.tag_name().name() == "seriesID")
-            .map_or(None, |node| node.text())
-            .map_or(None, |s| Some(String::from(s)));
+            .and_then(|node| node.text()).map(String::from);
 
         Ok(Item {
             id, title, description, viewed, res,
