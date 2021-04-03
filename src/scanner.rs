@@ -105,37 +105,31 @@ impl Scanner {
             .send().await?
             .text().await?;
 
-        let doc = match roxmltree::Document::parse(&resp) {
-            Ok(doc) => doc,
-            Err(_) => return Err(format!("Cannot parse XML from {}", location).into())
-        };
+        let doc = roxmltree::Document::parse(&resp)?;
 
         return self.extract_service_url(&doc, urn, &location);
     }
 
     // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()
     fn extract_service_url(&self, doc: &roxmltree::Document, urn: &URN, root_url: &Url) -> Result<Url> {
-        let service_type_elem = match doc.descendants().find(|n|
+        let service_type_elem = doc.descendants().find(|n|
             n.tag_name().name() == "serviceType" &&
             n.text() == Some(&urn.to_string())
-        ) {
-            Some(elem) => elem,
-            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
-        };
+        ).ok_or(format!("Cannot find service URL for URN {} at {}", urn, root_url))?;
 
         // Go up & down one
         let parent = service_type_elem.parent_element().expect("Cannot find element parent");
-        let control_url_element = match parent.descendants().find(|n| n.tag_name().name() == "controlURL") {
-            Some(url) => url,
-            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
-        };
+        let control_url_element = parent.descendants().find(|n|
+            n.tag_name().name() == "controlURL"
+        ).ok_or(format!("Cannot find service URL for URN {} at {}", urn, root_url))?;
 
         // Compose the request URL
         let mut result = root_url.clone();
-        result.set_path(match control_url_element.text() {
-            Some(text) => text,
-            None => return Err(format!("Cannot find service URL for URN {} at {}", urn, root_url).into())
-        });
+        result.set_path(
+            control_url_element
+                .text()
+                .ok_or(format!("Cannot find service URL for URN {} at {}", urn, root_url))?
+        );
 
         Ok(result)
     }
@@ -146,24 +140,15 @@ impl Scanner {
      * @return a map of <IP-Address, ServiceURL>
      */
     async fn ssdp_search(&self, st: &SearchTarget, urn: &URN) -> Result<HashMap<String, Url>> {
-        let mut locations: Vec<Url> = Vec::new();
+        let mut result: HashMap<String, Url> = HashMap::new();
+
         let mut responses = ssdp_client::search(st, TIMEOUT, 2).await?;
         while let Some(response) = responses.next().await {
-            let response = response?;
-            locations.push(Url::parse(response.location())?);
-        }
-
-        //TODO: join these two paras, and remove `locations`
-
-        // Get service-url for each location
-        let mut result: HashMap<String, Url> = HashMap::new();
-        for location in locations {
+            let location = Url::parse(response?.location())?;
             let browse_url = self.get_service_url(urn, &location).await?;
+
             result.insert(
-                match browse_url.host_str() {
-                    Some(string) => string.to_string(),
-                    None => return Err(format!("Cannot host component from URL {}", browse_url).into())
-                },
+                browse_url.host_str().ok_or("Absent host component from URL")?.into(),
                 browse_url);
         }
 

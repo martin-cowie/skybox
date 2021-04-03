@@ -68,10 +68,9 @@ fn string_of_element(elem: &roxmltree::Node, name: &str) -> Result<String> {
 }
 
 fn parse_duration(duration: &str) -> Result<Duration> {
-    let caps = match DURATION_RE.captures(duration) {
-        None => return Err(format!("Cannot parse duration: {}", duration).into()),
-        Some(caps) => caps
-    };
+    let caps = DURATION_RE
+        .captures(duration)
+        .ok_or(format!("Cannot parse duration: {}", duration))?;
 
     let hours: u32 = caps.get(1).ok_or("Hours field is absent")?.as_str().parse()?;
     let mins: u32 = caps.get(2).ok_or("Minutes field is absent")?.as_str().parse()?;
