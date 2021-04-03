@@ -21,10 +21,8 @@ pub struct SkyBox {
 impl SkyBox {
 
     pub fn save_box(&self) -> Result<()> {
-        return match self.save(&APP_INFO, PREFS_KEY) {
-            Ok(_) => Ok(()),
-            Err(error) => Err(format!("Cannot save skybox: {}", error).into())
-        }
+        self.save(&APP_INFO, PREFS_KEY)
+            .map_err(|error|format!("Cannot save skybox: {}", error).into())
     }
 
     pub fn load_box() -> Option<SkyBox> {
