@@ -6,6 +6,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 
 
+//TODO: Use simpler str& instead of String
 #[serde(rename_all = "PascalCase")]
 #[derive(Debug, Serialize)]
 pub struct Item {
@@ -57,8 +58,7 @@ lazy_static! {
     static ref DURATION_RE: Regex = Regex::new(r"P0D(\d+):(\d+):(\d+)").expect("Cannot compile regex!");
 }
 
-//TODO: return a simpler str& instead of String
-fn string_of_element(elem: roxmltree::Node, name: &str) -> Result<String> {
+fn string_of_element(elem: &roxmltree::Node, name: &str) -> Result<String> {
     let elem = elem.children().find(|e| e.tag_name().name() == name);
     let result: String = elem.ok_or(format!("Element `{}` is absent", name))?
         .text()
@@ -85,20 +85,20 @@ impl Item {
 
     pub fn build(elem: roxmltree::Node) -> Result<Item> {
 
-        let recorded_duration = string_of_element(elem, "recordedDuration")?;
+        let recorded_duration = string_of_element(&elem, "recordedDuration")?;
         let recorded_duration = parse_duration(recorded_duration.as_str())?.as_secs();
 
-        let recorded_starttime = string_of_element(elem, "recordedStartDateTime")?;
+        let recorded_starttime = string_of_element(&elem, "recordedStartDateTime")?;
         let id = elem.attribute("id").ok_or("Field `id` is absent")?.into();
-        let title = string_of_element(elem, "title")?;
-        let description = string_of_element(elem, "description")?;
-        let channel_name = string_of_element(elem, "channelName")?;
-        let res = string_of_element(elem, "res")?;
-        let service_type: i32 = string_of_element(elem, "X_genre")?.parse()?;
+        let title = string_of_element(&elem, "title")?;
+        let description = string_of_element(&elem, "description")?;
+        let channel_name = string_of_element(&elem, "channelName")?;
+        let res = string_of_element(&elem, "res")?;
+        let service_type: i32 = string_of_element(&elem, "X_genre")?.parse()?;
 
         let service_type = service_type_from(service_type);
 
-        let viewed = "1" == string_of_element(elem, "X_isViewed")?;
+        let viewed = "1" == string_of_element(&elem, "X_isViewed")?;
         let series_id = elem.children()
             .find(|e| e.tag_name().name() == "seriesID")
             .map_or(None, |node| node.text())
