@@ -75,8 +75,6 @@ impl SkyBox {
         let browse_elem = format!(r#"<u:Browse xmlns:u="urn:schemas-nds-com:service:SkyBrowse:2">{}</u:Browse>"#, arguments);
         let body = envelope(browse_elem.as_str());
 
-        // println!("body: {}", body);
-
         let client = reqwest::Client::new();
         let resp = client.post(&self.browse_url)
             .header("user-agent", USER_AGENT)
@@ -89,7 +87,7 @@ impl SkyBox {
             .await?;
 
         // Parse the response and get element 'Result'
-        let doc = roxmltree::Document::parse(&resp).unwrap();
+        let doc = roxmltree::Document::parse(&resp)?;
         let result_elem = doc.descendants().find(|n|
             n.tag_name().name() == "Result"
         ).unwrap();
@@ -103,7 +101,7 @@ impl SkyBox {
         let inner_xml = result_elem.text().unwrap();
 
         // parse inner XML
-        let doc = roxmltree::Document::parse(inner_xml).unwrap();
+        let doc = roxmltree::Document::parse(inner_xml)?;
         let items: Vec<_> = doc.descendants()
             .filter(|n|n.tag_name().name() == "item")
             .map(Item::build)
