@@ -1,10 +1,11 @@
 use super::item::Item;
 use super::common::{envelope, as_elements, Result};
 
-use serde::{Serialize, Deserialize};
+use std::fmt;
 use std::time::Instant;
 use maplit::hashmap;
-use preferences::{AppInfo, Preferences};
+use preferences::{AppInfo, PreferencesMap, Preferences};
+use reqwest::Url;
 
 const USER_AGENT: &str = "SKY_skyplus";
 const CONTENT_TYPE: &str = r#"text/xml; charset="utf-8""#;
@@ -12,21 +13,35 @@ const CONTENT_TYPE: &str = r#"text/xml; charset="utf-8""#;
 const APP_INFO: AppInfo = AppInfo{name: "skybox", author: "Martin Cowie"};
 const PREFS_KEY: &str = "skybox/location";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct SkyBox {
-    pub play_url: String,
-    pub browse_url: String
+    pub play_url: Url,
+    pub browse_url: Url,
+
+    client: reqwest::Client
 }
 
 impl SkyBox {
 
+    pub fn new(play_url: Url, browse_url: Url) -> SkyBox {
+        SkyBox{play_url, browse_url, client: reqwest::Client::new()}
+    }
+
     pub fn save_box(&self) -> Result<()> {
-        self.save(&APP_INFO, PREFS_KEY)
+        let mut map: PreferencesMap<String> = PreferencesMap::new();
+        map.insert("play".into(), self.play_url.to_string());
+        map.insert("browse".into(), self.browse_url.to_string());
+
+        map.save(&APP_INFO, PREFS_KEY)
             .map_err(|error|format!("Cannot save skybox: {}", error).into())
     }
 
-    pub fn load_box() -> Option<SkyBox> {
-        SkyBox::load(&APP_INFO, PREFS_KEY).ok()
+    pub fn load_box() -> Result<SkyBox> {
+        let map = PreferencesMap::<String>::load(&APP_INFO, PREFS_KEY)?;
+        let play_url = Url::parse(map.get("play").ok_or("Attribute `play` absent")?)?;
+        let browse_url = Url::parse(map.get("browse").ok_or("Attribute `play` absent")?)?;
+
+        Ok(SkyBox::new(play_url, browse_url))
     }
 
     pub async fn list_items(&self, _matches: &clap::ArgMatches) -> Result<()> {
@@ -73,8 +88,7 @@ impl SkyBox {
         let browse_elem = format!(r#"<u:Browse xmlns:u="urn:schemas-nds-com:service:SkyBrowse:2">{}</u:Browse>"#, arguments);
         let body = envelope(browse_elem.as_str());
 
-        let client = reqwest::Client::new();
-        let resp = client.post(&self.browse_url)
+        let resp = self.client.post(self.browse_url.clone())
             .header("user-agent", USER_AGENT)
             .header("Content-Type", CONTENT_TYPE)
             .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyBrowse:2#Browse""#)
@@ -137,8 +151,7 @@ impl SkyBox {
 
         let body = envelope(destroy_elem.as_str());
 
-        let client = reqwest::Client::new();
-        let resp = client.post(&self.browse_url)
+        let resp = self.client.post(self.browse_url.clone())
             .header("user-agent", USER_AGENT)
             .header("Content-Type", CONTENT_TYPE)
             .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyBrowse:2#DestroyObject""#)
@@ -168,8 +181,7 @@ impl SkyBox {
             }));
         let body = envelope(play_elem.as_str());
 
-        let client = reqwest::Client::new();
-        let resp = client.post(&self.play_url)
+        let resp = self.client.post(self.play_url.clone())
             .header("user-agent", USER_AGENT)
             .header("Content-Type", CONTENT_TYPE)
             .header("SOAPACTION", r#""urn:schemas-nds-com:service:SkyPlay:2#SetAVTransportURI""#)
@@ -183,7 +195,16 @@ impl SkyBox {
         } else {
             Err("Play request failed".into())
         }
+    }
+}
 
+impl fmt::Display for SkyBox {
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        let host = self.browse_url.host();
+        //FIXME:
+        write!(f, "{:?}", &host)
     }
 
 }

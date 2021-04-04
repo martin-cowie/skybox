@@ -26,7 +26,7 @@ impl Scanner {
     }
 
     pub fn get_selected(&self) -> Option<SkyBox> {
-        SkyBox::load_box()
+        SkyBox::load_box().ok()
     }
 
     pub async fn scan(&self) -> Result<()> {
@@ -59,18 +59,14 @@ impl Scanner {
             };
 
             println!("Found {} and {}", play_url, browse_url);
-            let skybox = SkyBox {
-                play_url: play_url.to_string() ,
-                browse_url: browse_url.to_string()
-            };
+            let skybox = SkyBox::new(play_url.clone(), browse_url);
             boxes.push(skybox);
         }
 
-        // TODO: rethink this struct
         spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
 
         for (i,skybox) in boxes.iter().enumerate() {
-            println!("{}:\t{:?}", i, skybox);
+            println!("{}:\t{}", i, skybox);
         }
         eprint!("Choose a skybox: ");
 
@@ -92,7 +88,7 @@ impl Scanner {
         };
 
         let skybox = &boxes[line_number];
-        println!("Using {:?}", skybox);
+        println!("Using {}", skybox);
 
         // Store the user's preferences
         return skybox.save_box();
