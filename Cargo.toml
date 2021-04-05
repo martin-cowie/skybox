@@ -23,3 +23,7 @@ url = "2.2.0"
 # preferences = "1.1.0"
 preferences = {git = "https://github.com/baysmith/preferences-rs.git"}
 serde = { version = "^1.0.0", features = ["derive"] }
+
+[[bin]]
+path = "src/main.rs"
+name = "skybox"

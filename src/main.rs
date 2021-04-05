@@ -13,7 +13,7 @@ use scanner::Scanner;
 #[tokio::main]
 async fn main() -> Result<()> {
 
-    let matches = clap_app!(skybox =>
+    let mut config = clap_app!(skybox =>
         (version: "0.1")
         (about: "Interacts with SkyPlus PVRs")
         (@subcommand scan =>
@@ -31,7 +31,8 @@ async fn main() -> Result<()> {
             (about: "play a recording")
             (@arg filename: +required "recording to play back, e.g. file://pvr/290B3177")
         )
-    ).get_matches();
+    );
+    let matches = config.clone().get_matches();
 
     let scanner = Scanner::new();
 
@@ -58,6 +59,10 @@ async fn main() -> Result<()> {
             None => println!("Use subcommand `scan` to find a skybox"),
             Some(skybox) => skybox.play(matches).await?
         }
+    }
+
+    else {
+        config.print_help()?;
     }
 
     Ok(())
