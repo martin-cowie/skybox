@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate num_derive;
+
 use clap::clap_app;
 mod common;
 mod item;

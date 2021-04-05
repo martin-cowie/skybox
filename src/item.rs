@@ -4,6 +4,7 @@ use serde::Serialize;
 use regex::Regex;
 use std::time::Duration;
 use lazy_static::lazy_static;
+use num_traits::FromPrimitive;
 
 
 //TODO: Use simpler str& instead of String
@@ -25,7 +26,7 @@ pub struct Item {
     service_type: ServiceType,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, FromPrimitive)]
 #[repr(u8)]
 pub enum ServiceType {
     Music = 16,
@@ -38,20 +39,6 @@ pub enum ServiceType {
     Kids = 2,
 
     Unknown = 0
-}
-
-fn service_type_from(num: i32) -> ServiceType { //TODO: surely something more idiomatic
-    match num {
-        16 => ServiceType::Music,
-        11 => ServiceType::Documentary,
-        8 => ServiceType::Lifestyle,
-        7 => ServiceType::Sport,
-        6 => ServiceType::Movies,
-        5 => ServiceType::News,
-        3 => ServiceType::Entertainment,
-        2 => ServiceType::Kids,
-        _ => ServiceType::Unknown
-    }
 }
 
 lazy_static! {
@@ -95,7 +82,8 @@ impl Item {
         let res = string_of_element(&elem, "res")?;
         let service_type: i32 = string_of_element(&elem, "X_genre")?.parse()?;
 
-        let service_type = service_type_from(service_type);
+        let service_type = FromPrimitive::from_i32(service_type)
+            .unwrap_or(ServiceType::Unknown);
 
         let viewed = "1" == string_of_element(&elem, "X_isViewed")?;
         let series_id = elem.children()
