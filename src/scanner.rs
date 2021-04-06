@@ -80,14 +80,8 @@ impl Scanner {
             }
         };
 
-        let line_number: usize = match line.parse() {
-            Ok(number) => number,
-            Err(_) => {
-                panic!("Cannot parse '{}' as a number", line)
-            }
-        };
-
-        let skybox = &boxes[line_number];
+        let line_number: usize = line.parse()?;
+        let skybox = &boxes.get(line_number).ok_or("Not an existant skybox")?;
         println!("Using {}", skybox);
 
         // Store the user's preferences
