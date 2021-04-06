@@ -6,6 +6,7 @@ mod common;
 mod item;
 mod skybox;
 mod scanner;
+mod lister;
 
 use common::Result;
 use scanner::Scanner;

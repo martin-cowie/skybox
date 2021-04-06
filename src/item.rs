@@ -9,7 +9,7 @@ use num_traits::FromPrimitive;
 
 //TODO: Use simpler str& instead of String
 #[serde(rename_all = "PascalCase")]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Item {
     id: String,
     res: String,
@@ -26,7 +26,7 @@ pub struct Item {
     service_type: ServiceType,
 }
 
-#[derive(Debug, Serialize, FromPrimitive)]
+#[derive(Debug, Serialize, FromPrimitive, Clone)]
 #[repr(u8)]
 pub enum ServiceType {
     Music = 16,

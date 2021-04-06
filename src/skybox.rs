@@ -1,8 +1,9 @@
 use super::item::Item;
 use super::common::{envelope, as_elements, Result};
+use super::lister;
+use super::lister::Lister;
 
 use std::fmt;
-use std::time::Instant;
 use maplit::hashmap;
 use preferences::{AppInfo, PreferencesMap, Preferences};
 use reqwest::Url;
@@ -45,27 +46,23 @@ impl SkyBox {
     }
 
     pub async fn list_items(&self, _matches: &clap::ArgMatches) -> Result<()> {
-        let query_start = Instant::now();
-
-        let mut starting_index: usize = 0;
         let requested_count: usize = 25;
+        let mut starting_index: usize = 0;
 
-        let mut wtr = csv::Writer::from_writer(std::io::stdout());
+        let (_, total_items) = self.fetch_items(0, 0).await?;
+        let mut lister = lister::build_lister(total_items);
 
         loop {
-            let (items, total_items) = self.fetch_items(starting_index, requested_count).await?;
-            eprintln!("Fetched {}/{} items.", starting_index + items.len(), total_items);
+            let (items, _) = self.fetch_items(starting_index, requested_count).await?;
 
-            for item in items.iter() {
-                wtr.serialize(item)?;
-            }
+            lister.list(&items);
 
             if items.len() < requested_count {
                 break;
             }
             starting_index += items.len();
         }
-        eprintln!("Fetched {} items from {} in {}s", starting_index, &self.browse_url, query_start.elapsed().as_secs());
+        lister.close();
 
         Ok(())
     }
