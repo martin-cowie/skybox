@@ -6,24 +6,22 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use num_traits::FromPrimitive;
 
-
-//TODO: Use simpler str& instead of String
 #[serde(rename_all = "PascalCase")]
 #[derive(Debug, Serialize, Clone)]
 pub struct Item {
-    id: String,
-    res: String,
+    pub id: String,
+    pub res: String,
 
-    title: String,
-    description: String,
-    viewed: bool,
+    pub title: String,
+    pub description: String,
+    pub viewed: bool,
 
-    recorded_starttime: String,
-    recorded_duration: u64, //Seconds
+    pub recorded_starttime: String,
+    pub recorded_duration: u64, //Seconds
 
-    channel_name: String,
-    series_id: Option<String>,
-    service_type: ServiceType,
+    pub channel_name: String,
+    pub series_id: Option<String>,
+    pub service_type: ServiceType,
 }
 
 #[derive(Debug, Serialize, FromPrimitive, Clone)]

@@ -22,7 +22,10 @@ async fn main() -> Result<()> {
         )
         (@subcommand ls =>
             (about: "list recordings")
-            (@arg long: -l "Long items listing")
+            (@arg UNWATCHED: -u "Exclude viewed recordings")
+            (@arg TIME_ORDER: -t "list in time order")
+            (@arg REVERSE_TIME: -r "reverse time order")
+            (@arg FORMAT: -o --output +takes_value "Output: JSON|CSV")
         )
         (@subcommand rm =>
             (about: "remove recordings")

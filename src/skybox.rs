@@ -45,12 +45,12 @@ impl SkyBox {
         Ok(SkyBox::new(play_url, browse_url))
     }
 
-    pub async fn list_items(&self, _matches: &clap::ArgMatches) -> Result<()> {
+    pub async fn list_items(&self, matches: &clap::ArgMatches) -> Result<()> {
         let requested_count: usize = 25;
         let mut starting_index: usize = 0;
 
         let (_, total_items) = self.fetch_items(0, 0).await?;
-        let mut lister = lister::build_lister(total_items);
+        let mut lister = lister::build_lister(total_items, matches);
 
         loop {
             let (items, _) = self.fetch_items(starting_index, requested_count).await?;

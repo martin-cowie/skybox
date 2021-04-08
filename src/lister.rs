@@ -10,8 +10,13 @@ pub trait Lister {
 /**
  * Factory: build a lister
  */
-pub fn build_lister(item_count: usize) -> impl Lister {
-    ProgressLister::new(item_count,  CSVLister::new(item_count))
+pub fn build_lister(item_count: usize, matches: &clap::ArgMatches) -> impl Lister {
+    //TODO: refactor -  ProgressLister::new is repeated
+    match matches.value_of("FORMAT") {
+        Some("JSON") => ProgressLister::new(item_count, JSONLister::new(item_count)),
+        Some("CSV") => ProgressLister::new(item_count, CSVLister::new(item_count)),
+        _ => ProgressLister::new(item_count, SimpleLister::new(item_count, matches.clone()))
+    }
 }
 
 
@@ -31,7 +36,7 @@ struct ProgressLister {
 impl ProgressLister {
     fn new(item_count: usize, inner: impl Lister + 'static) -> Self {
         let prog = ProgressBar::new(item_count as u64);
-        prog.set_message("Fetching records");
+        prog.println("Fetching recordings from skybox");
 
         ProgressLister {
             start: std::time::Instant::now(),
@@ -91,4 +96,73 @@ impl Lister for CSVLister {
         }
     }
 
+}
+
+/**
+ * Output Items as JSON
+ */
+
+struct JSONLister {
+    items: Vec<Item>
+}
+
+impl JSONLister {
+    fn new(item_count: usize) -> Self {
+        JSONLister{
+            items: Vec::with_capacity(item_count),
+        }
+    }
+}
+
+impl Lister for JSONLister {
+    fn list(&mut self, items: &[Item]) {
+        self.items.extend_from_slice(items);
+    }
+
+    fn close(&mut self) {
+        println!("{}", serde_json::to_string(&self.items).expect("Cannot serialise result"));
+    }
+}
+
+/**
+ * Output Items a text
+ */
+struct SimpleLister {
+    items: Vec<Item>,
+    matches: clap::ArgMatches
+}
+
+impl SimpleLister {
+    fn new(item_count: usize, matches: clap::ArgMatches) -> Self {
+        SimpleLister{
+            items: Vec::with_capacity(item_count),
+            matches: matches
+        }
+    }
+}
+
+impl Lister for SimpleLister {
+    fn list(&mut self, items: &[Item]) {
+        self.items.extend_from_slice(items);
+    }
+
+    fn close(&mut self) {
+
+        // if self.matches.is_present("TIME_ORDER") {
+        //     if self.matches.is_present("REVERSE_TIME") {
+        //         self.items.sort_by(|a,b| a.recorded_starttime < b.recorded_starttime)
+        //     } else {
+
+        //     }
+        // }
+
+        for item in self.items.iter() {
+            println!("{} {} {}: {}",
+                item.recorded_starttime,
+                item.recorded_duration,
+                item.title,
+                item.description
+            );
+        }
+    }
 }
