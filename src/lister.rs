@@ -148,13 +148,13 @@ impl Lister for SimpleLister {
 
     fn close(&mut self) {
 
-        // if self.matches.is_present("TIME_ORDER") {
-        //     if self.matches.is_present("REVERSE_TIME") {
-        //         self.items.sort_by(|a,b| a.recorded_starttime < b.recorded_starttime)
-        //     } else {
-
-        //     }
-        // }
+        if self.matches.is_present("TIME_ORDER") {
+            if self.matches.is_present("REVERSE_TIME") {
+                self.items.sort_by(|a,b| a.recorded_starttime.cmp(&b.recorded_starttime))
+            } else {
+                self.items.sort_by(|a,b| b.recorded_starttime.cmp(&a.recorded_starttime))
+            }
+        }
 
         for item in self.items.iter() {
             println!("{} {} {}: {}",

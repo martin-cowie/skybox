@@ -5,6 +5,7 @@ use regex::Regex;
 use std::time::Duration;
 use lazy_static::lazy_static;
 use num_traits::FromPrimitive;
+use chrono::{DateTime, FixedOffset};
 
 #[serde(rename_all = "PascalCase")]
 #[derive(Debug, Serialize, Clone)]
@@ -16,7 +17,7 @@ pub struct Item {
     pub description: String,
     pub viewed: bool,
 
-    pub recorded_starttime: String,
+    pub recorded_starttime: DateTime<FixedOffset>,
     pub recorded_duration: u64, //Seconds
 
     pub channel_name: String,
@@ -72,7 +73,7 @@ impl Item {
         let recorded_duration = string_of_element(&elem, "recordedDuration")?;
         let recorded_duration = parse_duration(recorded_duration.as_str())?.as_secs();
 
-        let recorded_starttime = string_of_element(&elem, "recordedStartDateTime")?;
+        let recorded_starttime = DateTime::parse_from_rfc3339(&string_of_element(&elem, "recordedStartDateTime")?)?;
         let id = elem.attribute("id").ok_or("Field `id` is absent")?.into();
         let title = string_of_element(&elem, "title")?;
         let description = string_of_element(&elem, "description")?;
