@@ -67,7 +67,7 @@ impl Scanner {
         if boxes.len() < 1 {
             let message = "No sky box found";
             spinner.finish_with_message(message);
-            return Err(Box::new(StringError::new(message)));
+            return Err(StringError::new(message).into());
         }
 
         spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
