@@ -7,34 +7,34 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'skyplus'",
+            "name": "Debug executable 'skybox'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=skyplus",
-                    "--package=skyplus"
+                    "--bin=skybox",
+                    "--package=skybox"
                 ],
                 "filter": {
-                    "name": "skyplus",
+                    "name": "skybox",
                     "kind": "bin"
                 }
             },
-            "args": ["ls"],
+            "args": ["scan"],
             "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'skyplus'",
+            "name": "Debug unit tests in executable 'skybox'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=skyplus",
-                    "--package=skyplus"
+                    "--bin=skybox",
+                    "--package=skybox"
                 ],
                 "filter": {
-                    "name": "skyplus",
+                    "name": "skybox",
                     "kind": "bin"
                 }
             },

@@ -1,5 +1,5 @@
 [package]
-name = "skyplus"
+name = "skybox"
 version = "0.1.0"
 authors = ["Martin Cowie <martinjcowie@gmail.com>"]
 edition = "2018"

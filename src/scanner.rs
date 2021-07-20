@@ -1,4 +1,4 @@
-use super::common::{Result, SKY_BROWSE, SKY_PLAY};
+use super::common::{Result, SKY_BROWSE, SKY_PLAY, StringError};
 use super::skybox::SkyBox;
 
 use indicatif::ProgressBar;
@@ -63,8 +63,14 @@ impl Scanner {
             boxes.push(skybox);
         }
 
-        spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
 
+        if boxes.len() < 1 {
+            let message = "No sky box found";
+            spinner.finish_with_message(message);
+            return Err(Box::new(StringError::new(message)));
+        }
+
+        spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());
         for (i,skybox) in boxes.iter().enumerate() {
             println!("{}:\t{}", i, skybox);
         }

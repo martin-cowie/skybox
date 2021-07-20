@@ -1,5 +1,6 @@
 use ssdp_client::URN;
-
+use std::error::Error;
+use std::fmt;
 
 // A simple type alias so as to DRY.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -20,4 +21,27 @@ pub fn as_elements(arguments: &std::collections::HashMap<&str, &str>) -> String 
         .map(|(key, value)| format!("<{}>{}</{}>", &key, &value, &key))
         .collect::<Vec<_>>()
         .join("")
+}
+
+#[derive(Debug)]
+pub struct StringError {
+    details: String
+}
+
+impl StringError {
+    pub fn new(msg: &str) -> StringError {
+        StringError{details: msg.to_string()}
+    }
+}
+
+impl fmt::Display for StringError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{}",self.details)
+    }
+}
+
+impl Error for StringError {
+    fn description(&self) -> &str {
+        &self.details
+    }
 }
