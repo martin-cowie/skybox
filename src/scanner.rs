@@ -1,4 +1,5 @@
-use super::common::{Result, SKY_BROWSE, SKY_PLAY, StringError};
+use super::common::{SKY_BROWSE, SKY_PLAY};
+use super::common::errors::*;
 use super::skybox::SkyBox;
 
 use indicatif::ProgressBar;
@@ -67,7 +68,7 @@ impl Scanner {
         if boxes.len() < 1 {
             let message = "No sky box found";
             spinner.finish_with_message(message);
-            return Err(StringError::new(message).into());
+            return Err(message.into());
         }
 
         spinner.finish_with_message(format!("Found {} skybox", boxes.len()).as_str());

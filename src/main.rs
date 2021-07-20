@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate num_derive;
+#[macro_use]
+extern crate error_chain;
 
 use clap::clap_app;
 mod common;
@@ -8,7 +10,7 @@ mod skybox;
 mod scanner;
 mod lister;
 
-use common::Result;
+use common::errors::Result;
 use scanner::Scanner;
 
 #[tokio::main]

@@ -1,9 +1,4 @@
 use ssdp_client::URN;
-use std::error::Error;
-use std::fmt;
-
-// A simple type alias so as to DRY.
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 pub const SKY_PLAY: URN = URN::service("schemas-nds-com", "SkyPlay", 2);
 pub const SKY_BROWSE: URN = URN::service("schemas-nds-com", "SkyBrowse", 2);
@@ -23,25 +18,18 @@ pub fn as_elements(arguments: &std::collections::HashMap<&str, &str>) -> String 
         .join("")
 }
 
-#[derive(Debug)]
-pub struct StringError {
-    details: String
-}
-
-impl StringError {
-    pub fn new(msg: &str) -> StringError {
-        StringError{details: msg.to_string()}
-    }
-}
-
-impl fmt::Display for StringError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{}",self.details)
-    }
-}
-
-impl Error for StringError {
-    fn description(&self) -> &str {
-        &self.details
+pub mod errors {
+    // Create the Error, ErrorKind, ResultExt, and Result types
+    error_chain! {
+        foreign_links {
+            Io(std::io::Error);
+            ParseIntError(std::num::ParseIntError);
+            PreferencesError(preferences::PreferencesError);
+            ParseError(url::ParseError);
+            Reqwest(reqwest::Error);
+            Roxmltree(roxmltree::Error);
+            Chrono(chrono::ParseError);
+            SsdpClient(ssdp_client::Error);
+        }
     }
 }

@@ -1,4 +1,4 @@
-use super::common::Result;
+use super::common::errors::Result;
 
 use serde::Serialize;
 use regex::Regex;
