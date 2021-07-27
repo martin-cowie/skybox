@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use num_traits::FromPrimitive;
 use chrono::{DateTime, FixedOffset};
 
-#[serde(rename_all = "PascalCase")]
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct Item {
     pub id: String,
     pub res: String,
