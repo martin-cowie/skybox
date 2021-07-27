@@ -11,12 +11,11 @@ pub trait Lister {
  * Factory: build a lister
  */
 pub fn build_lister(item_count: usize, matches: &clap::ArgMatches) -> impl Lister {
-    //TODO: refactor -  ProgressLister::new is repeated
-    match matches.value_of("FORMAT") {
-        Some("JSON") => ProgressLister::new(item_count, JSONLister::new(item_count)),
-        Some("CSV") => ProgressLister::new(item_count, CSVLister::new(item_count)),
-        _ => ProgressLister::new(item_count, SimpleLister::new(item_count, matches.clone()))
-    }
+    ProgressLister::new(item_count, match matches.value_of("FORMAT") {
+        Some("JSON") => Box::new(JSONLister::new(item_count)) as Box<dyn Lister>,
+        Some("CSV") => Box::new(CSVLister::new(item_count)) as Box<dyn Lister>,
+        _ => Box::new(SimpleLister::new(item_count, matches.clone()))
+    })
 }
 
 
@@ -34,7 +33,7 @@ struct ProgressLister {
 }
 
 impl ProgressLister {
-    fn new(item_count: usize, inner: impl Lister + 'static) -> Self {
+    fn new(item_count: usize, inner: Box<dyn Lister>) -> Self {
         let prog = ProgressBar::new(item_count as u64);
         prog.println("Fetching recordings from skybox");
 
@@ -42,7 +41,7 @@ impl ProgressLister {
             start: std::time::Instant::now(),
             progress: prog,
             item_count,
-            inner: Box::new(inner)
+            inner: inner
         }
     }
 
