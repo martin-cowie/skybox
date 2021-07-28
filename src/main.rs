@@ -38,39 +38,27 @@ async fn main() -> Result<()> {
             (@arg filename: +required "recording to play back, e.g. file://pvr/290B3177")
         )
     );
-    let matches = config.clone().get_matches();
 
+    let matches = config.clone().get_matches();
     let scanner = Scanner::new();
 
-    match matches.subcommand_name() {
-        Some("scan") => {
-            return scanner.scan().await;
-        }
-        Some("ls") => {
-            match scanner.get_selected() {
-                None => println!("Use subcommand `scan` to find a skybox"),
-                Some(skybox) => skybox.list_items(&matches).await?
+    match matches.subcommand() {
+        Some(("scan",_)) => scanner.scan().await?,
+
+        Some((subcommand, matches)) => {
+            if let Some(skybox) = scanner.get_selected() {
+                match subcommand {
+                    "ls" => skybox.list_items(matches).await?,
+                    "rm" => skybox.remove_items(matches).await?,
+                    "play" => skybox.play(matches).await?,
+                    _ => config.print_help()?
+                }
+            } else {
+                println!("Use subcommand `scan` to find a skybox");
             }
         }
-        Some("rm") => {
-            match scanner.get_selected() {
-                None => println!("Use subcommand `scan` to find a skybox"),
-                Some(skybox) => skybox.remove_items(&matches).await?
-            }
-        }
-        Some("play") => {
-            match scanner.get_selected() {
-                None => println!("Use subcommand `scan` to find a skybox"),
-                Some(skybox) => skybox.play(&matches).await?
-            }
-        }
-        Some(sub_command) => {
-            println!("Unexpected subcommand {}", sub_command);
-            config.print_help()?;
-        }
-        None => {
-            config.print_help()?;
-        }
+
+        _ => config.print_help()?
     }
 
     Ok(())
