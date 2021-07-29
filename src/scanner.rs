@@ -65,7 +65,7 @@ impl Scanner {
         }
 
 
-        if boxes.len() < 1 {
+        if boxes.is_empty() {
             let message = "No sky box found";
             spinner.finish_with_message(message);
             return Err(message.into());
@@ -92,7 +92,7 @@ impl Scanner {
         println!("Using {}", skybox);
 
         // Store the user's preferences
-        return skybox.save_box();
+        skybox.save_box()
     }
 
     async fn get_service_url(&self, urn: &URN, location: &Url) -> Result<Url> {
@@ -104,7 +104,7 @@ impl Scanner {
 
         let doc = roxmltree::Document::parse(&resp)?;
 
-        return self.extract_service_url(&doc, urn, &location);
+        self.extract_service_url(&doc, urn, &location)
     }
 
     // Get XPath /root/device/serviceList/service[serviceType/text()='${serviceType}']/controlURL/text()

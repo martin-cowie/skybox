@@ -89,13 +89,7 @@ impl Item {
             .find(|e| e.tag_name().name() == "seriesID")
             .and_then(|node| node.text()).map(String::from);
 
-        Ok(Item {
-            id, title, description, viewed, res,
-            recorded_starttime, recorded_duration,
-            channel_name,
-            series_id,
-            service_type,
-        })
+        Ok(Item { id, res, title, description, viewed, recorded_starttime, recorded_duration, channel_name, series_id, service_type })
     }
 }
 

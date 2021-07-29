@@ -1,5 +1,4 @@
 use super::item::Item;
-use csv;
 use indicatif::ProgressBar;
 
 pub trait Lister {
@@ -41,7 +40,7 @@ impl ProgressLister {
             start: std::time::Instant::now(),
             progress: prog,
             item_count,
-            inner: inner
+            inner
         }
     }
 
@@ -135,7 +134,7 @@ impl SimpleLister {
     fn new(item_count: usize, matches: clap::ArgMatches) -> Self {
         SimpleLister{
             items: Vec::with_capacity(item_count),
-            matches: matches
+            matches
         }
     }
 }
