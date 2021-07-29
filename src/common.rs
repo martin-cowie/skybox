@@ -33,3 +33,32 @@ pub mod errors {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use maplit::hashmap;
+
+    #[test]
+    fn test_envelope() {
+        let xml_source = envelope("<test-element/>");
+        let document = roxmltree::Document::parse(xml_source.as_str()).unwrap();
+
+        let body_element = document.root_element().first_element_child().unwrap();
+        let payload_element = body_element.first_element_child().unwrap();
+
+        assert_eq!("Body", body_element.tag_name().name());
+        assert_eq!("test-element", payload_element.tag_name().name());
+    }
+
+    #[test]
+    fn test_as_elements() {
+
+        let str = as_elements(&hashmap!{
+            "foo" => "bar"
+        });
+
+        assert_eq!("<foo>bar</foo>", str);
+    }
+
+}
